@@ -8,10 +8,9 @@ import (
 	"strconv"
 )
 
-var listFlag bool
+var listFlag, pstateEnable, pstateDisable bool
 var pstateFlag int
 var fidFlag, didFlag, vidFlag uint64
-
 var pstates = [...]int64{
 	0xC0010064,
 	0xC0010065,
@@ -22,9 +21,12 @@ var pstates = [...]int64{
 	0xC001006A,
 	0xC001006B,
 }
+var tscLock int64 = 0xC0010015
 
 func initFlags() {
 	flag.BoolVar(&listFlag, "l", false, "List all pstates")
+	flag.BoolVar(&pstateEnable, "enable", false, "Enable pstate")
+	flag.BoolVar(&pstateDisable, "disable", false, "Disable pstate")
 	flag.IntVar(&pstateFlag, "p", -1, "pstate to set")
 	flag.Uint64Var(&fidFlag, "fid", 0, "FID to set (hex)")
 	flag.Uint64Var(&didFlag, "did", 0, "DID to set (hex)")
@@ -34,38 +36,43 @@ func initFlags() {
 
 func main() {
 	initFlags()
-	//newFID := uint64(0xA0)
-	//newMSR := (msrValue &^ 0xff) + newFID
-	//newDID := uint64(0x8)
-	//newMSR2 := (newMSR &^ (0x3f << 8)) + (newDID << 8)
-	//fmt.Println(pstateToString(newMSR2))
-	//newVID := uint64(0x20)
-	//newMSR3 := (newMSR2 &^ (0xff << 14)) + (newVID << 14)
-	//fmt.Println(pstateToString(newMSR3))
 	if listFlag {
 		for _, pstate := range pstates {
 			fmt.Println(pstateToString(readMSR(pstate)))
 		}
 	}
-	if pstateFlag >= 0 {
+	if pstateFlag >= 0 && pstateFlag < 8 {
 		msrValue := readMSR(pstates[0])
 		newMSR := msrValue
-		fmt.Println("Current pstate" + strconv.Itoa(pstateFlag) + ": " + pstateToString(msrValue))
+		fmt.Printf("Current pstate%d: %s\n", pstateFlag, pstateToString(msrValue))
+		if pstateEnable {
+			newMSR = setBit(newMSR, 63)
+			fmt.Printf("Enabled pstate%d", pstateFlag)
+		}
+		if pstateDisable {
+			newMSR = clearBit(newMSR, 63)
+			fmt.Printf("Disabled pstate%d", pstateFlag)
+		}
 		if fidFlag > 0 {
-			newMSR = setFid(msrValue, fidFlag)
+			newMSR = setFid(newMSR, fidFlag)
 			fmt.Printf("Setting FID to %X\n", fidFlag)
 		}
 		if didFlag > 0 {
-			newMSR = setDid(msrValue, didFlag)
+			newMSR = setDid(newMSR, didFlag)
 			fmt.Printf("Setting DID to %X\n", didFlag)
 		}
 		if vidFlag > 0 {
-			newMSR = setVid(msrValue, vidFlag)
+			newMSR = setVid(newMSR, vidFlag)
 			fmt.Printf("Setting VID to %X\n", vidFlag)
 		}
 		if newMSR != msrValue {
+			tscValue := readMSR(tscLock)
+			if !hasBit(tscValue, 21) {
+				writeMSR(tscLock, setBit(tscValue, 21))
+				fmt.Println("Locking TSC frequency")
+			}
 			writeMSR(pstates[pstateFlag], newMSR)
-			fmt.Println("New pstate" + strconv.Itoa(pstateFlag) + ": " + pstateToString(readMSR(pstates[pstateFlag])))
+			fmt.Printf("New pstate%d: %v\n", pstateFlag, pstateToString(readMSR(pstates[pstateFlag])))
 		}
 	}
 }
@@ -93,7 +100,7 @@ func readMSR(msr int64) uint64 {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(value)
+	//fmt.Println(value)
 	return binary.LittleEndian.Uint64(value)
 }
 
@@ -105,7 +112,7 @@ func writeMSR(msr int64, value uint64) {
 		}
 		byteValue := make([]byte, 8)
 		binary.LittleEndian.PutUint64(byteValue, value)
-		fmt.Println(byteValue)
+		//fmt.Println(byteValue)
 		_, err = f.WriteAt(byteValue, msr)
 		if err != nil {
 			panic(err)
