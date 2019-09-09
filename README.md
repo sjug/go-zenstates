@@ -2,7 +2,7 @@
 
 go-zenstates is a p-state overclocking tool for linux. By acccesing the MSR of new AMD Ryzen processors, we can adjust p-states on the fly from the desktop.
 
-All credit goes to [elmor](http://www.overclock.net/u/401414/elmor) from Asus for getting the MSR locations. AMD also has provided more MSR info in their [Ryzen Processor Programming Reference](https://support.amd.com/TechDocs/54945_PPR_Family_17h_Models_00h-0Fh.pdf) (pdf).
+All credit goes to [elmor](http://www.overclock.net/u/401414/elmor) from Asus for getting the MSR locations. AMD also has provided more MSR info in their Ryzen Processor Programming Reference [[pdf]](https://developer.amd.com/wordpress/media/2017/11/54945_PPR_Family_17h_Models_00h-0Fh.pdf).
 
 ## Installation
 
